@@ -1,3 +1,11 @@
+from flask import request
+
+
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
 from flask import Flask, jsonify
 from extension import db
 from models import Planet, People, User, Favorite
@@ -5,6 +13,8 @@ from models import Planet, People, User, Favorite
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///starwars.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
+jwt = JWTManager(app)
 
 db.init_app(app)
 
@@ -64,11 +74,40 @@ def get_all_users():
 
     return jsonify([{"id": user.id, "username": user.username} for user in all_users]), 200
 
+@app.route("/login", methods=["POST"])
+def login():
+    username = request.json.get("username", None)
+
+    user = User.query.filter_by(username=username).first()
+
+    if not user:
+        return jsonify({"msg": "Bad username or password"}), 401
+
+    access_token = create_access_token(identity=username)
+    return jsonify(access_token=access_token), 200
+
+@app.route('/register', methods=['POST'])
+def register():
+    username = request.json.get('username', None)
+
+
+    if not username:
+        return jsonify({"msg": "Missing username or password"}), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"msg": "Username already exists"}), 400
+
+    new_user = User(username=username)
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({"msg": "User created successfully"}), 201
+
 
 @app.route('/users/favorites', methods=['GET'])
+@jwt_required()
 def get_user_favorites():
-
-    current_user_id = 1
+    current_user_id = get_jwt_identity()
     favorites = Favorite.query.filter_by(user_id=current_user_id).all()
     favorite_list = []
     for fav in favorites:
@@ -83,8 +122,9 @@ def get_user_favorites():
 
 
 @app.route('/favorite/planet/<int:planet_id>', methods=['POST'])
+@jwt_required()
 def add_favorite_planet(planet_id):
-    current_user_id = 1
+    current_user_id = get_jwt_identity()
     favorite = Favorite(user_id=current_user_id, planet_id=planet_id)
     db.session.add(favorite)
     db.session.commit()
@@ -93,8 +133,9 @@ def add_favorite_planet(planet_id):
 
 
 @app.route('/favorite/people/<int:people_id>', methods=['POST'])
+@jwt_required()
 def add_favorite_people(people_id):
-    current_user_id = 1 
+    current_user_id = get_jwt_identity() 
     favorite = Favorite(user_id=current_user_id, people_id=people_id)
     db.session.add(favorite)
     db.session.commit()
@@ -103,8 +144,9 @@ def add_favorite_people(people_id):
 
 
 @app.route('/favorite/planet/<int:planet_id>', methods=['DELETE'])
+@jwt_required()
 def delete_favorite_planet(planet_id):
-    current_user_id = 1  
+    current_user_id = get_jwt_identity()  
     favorite = Favorite.query.filter_by(user_id=current_user_id, planet_id=planet_id).first()
     if favorite:
         db.session.delete(favorite)
@@ -115,8 +157,9 @@ def delete_favorite_planet(planet_id):
 
 
 @app.route('/favorite/people/<int:people_id>', methods=['DELETE'])
+@jwt_required()
 def delete_favorite_people(people_id):
-    current_user_id = 1 
+    current_user_id = get_jwt_identity() 
     favorite = Favorite.query.filter_by(user_id=current_user_id, people_id=people_id).first()
     if favorite:
         db.session.delete(favorite)
