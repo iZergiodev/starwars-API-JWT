@@ -81,7 +81,7 @@ def login():
     user = User.query.filter_by(username=username).first()
 
     if not user:
-        return jsonify({"msg": "Bad username or password"}), 401
+        return jsonify({"msg": "Bad username!"}), 401
 
     access_token = create_access_token(identity=username)
     return jsonify(access_token=access_token), 200
@@ -92,7 +92,7 @@ def register():
 
 
     if not username:
-        return jsonify({"msg": "Missing username or password"}), 400
+        return jsonify({"msg": "Missing username!"}), 400
 
     if User.query.filter_by(username=username).first():
         return jsonify({"msg": "Username already exists"}), 400
